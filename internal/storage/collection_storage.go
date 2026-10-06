@@ -86,6 +86,22 @@ func GetCollections(ctx context.Context, userID uint, isAdmin bool, search strin
 	return collections, nil
 }
 
+func GetCollection(ctx context.Context, userID uint, isAdmin bool, id int) (models.Collection, error) {
+	if collectionDB == nil {
+		return models.Collection{}, errors.New("conexão com o banco não inicializada")
+	}
+
+	var collection models.Collection
+	err := scopeByUser(collectionDB.WithContext(ctx), userID, isAdmin).
+		Preload("Category").
+		First(&collection, id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return collection, ErrNotFound
+	}
+
+	return collection, err
+}
+
 func UpdateCollection(ctx context.Context, userID uint, isAdmin bool, id int, name string, categoryID int, bin *BinaryObjectPayload) (models.Collection, error) {
 	if collectionDB == nil {
 		return models.Collection{}, errors.New("conexão com o banco não inicializada")
