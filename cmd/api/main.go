@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"collection-manager-backend/internal/handlers"
 	"collection-manager-backend/internal/models"
 	"collection-manager-backend/internal/routes"
+	"collection-manager-backend/internal/search"
 	"collection-manager-backend/internal/storage"
 
 	"github.com/gin-contrib/cors"
@@ -61,9 +63,20 @@ func main() {
 	aiClient := ai.NewClient(
 		envOrDefault("OLLAMA_URL", "http://localhost:11434"),
 		envOrDefault("OLLAMA_MODEL", "gemma4:12b"),
-	)
+	).WithEmbedModel(envOrDefault("OLLAMA_EMBED_MODEL", ai.DefaultEmbedModel))
 	handlers.InitSuggester(aiClient)
 	handlers.InitAnalyzer(aiClient)
+
+	indexer := search.NewIndexer(aiClient, storage.IndexStore{})
+	handlers.InitIndexer(indexer.IndexItemAsync)
+	go func() {
+		n, err := indexer.IndexMissing(context.Background())
+		if err != nil {
+			log.Printf("indexação inicial falhou: %v", err)
+			return
+		}
+		log.Printf("indexação inicial: %d item(ns) indexado(s)", n)
+	}()
 
 	router := gin.Default()
 

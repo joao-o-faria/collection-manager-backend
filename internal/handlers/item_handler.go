@@ -82,6 +82,7 @@ func CreateItem(c *gin.Context) {
 		return
 	}
 
+	notifyItemSaved(item.ID)
 	c.JSON(http.StatusCreated, item)
 }
 
@@ -140,6 +141,7 @@ func UpdateItem(c *gin.Context) {
 		return
 	}
 
+	notifyItemSaved(item.ID)
 	c.JSON(http.StatusOK, item)
 }
 
