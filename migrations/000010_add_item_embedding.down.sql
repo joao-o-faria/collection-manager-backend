@@ -1,0 +1,2 @@
+ALTER TABLE items
+    DROP COLUMN IF EXISTS embedding;

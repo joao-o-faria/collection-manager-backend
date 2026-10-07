@@ -11,4 +11,5 @@ type Item struct {
 	UserID         uint          `json:"user_id" gorm:"not null;index"`
 	BinaryObjectID *int          `json:"binary_object_id"`
 	BinaryObject   *BinaryObject `json:"binary_object,omitempty" gorm:"foreignKey:BinaryObjectID"`
+	Embedding      Vector        `json:"-" gorm:"type:real[]"`
 }
