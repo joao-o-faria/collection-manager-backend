@@ -32,6 +32,8 @@ func InitSearch(e queryEmbedder) {
 type SearchResult struct {
 	Item  models.Item `json:"item"`
 	Score *float32    `json:"score"`
+	// Match diz como o item foi encontrado: "text" (contém a frase) ou "semantic".
+	Match string `json:"match"`
 }
 
 type SearchResponse struct {
@@ -66,7 +68,7 @@ func SearchItems(c *gin.Context) {
 	if !semanticOK {
 		results := make([]SearchResult, 0, len(textItems))
 		for _, item := range textItems {
-			results = append(results, SearchResult{Item: item})
+			results = append(results, SearchResult{Item: item, Match: "text"})
 		}
 		c.JSON(http.StatusOK, SearchResponse{Mode: "text", Results: results})
 		return
@@ -76,7 +78,7 @@ func SearchItems(c *gin.Context) {
 	results := make([]SearchResult, 0, search.Limit)
 	seen := make(map[int]bool)
 	for _, item := range textItems {
-		results = append(results, SearchResult{Item: item, Score: scoreOf(item.ID)})
+		results = append(results, SearchResult{Item: item, Score: scoreOf(item.ID), Match: "text"})
 		seen[item.ID] = true
 	}
 	for _, r := range semantic {
@@ -137,7 +139,7 @@ func semanticSearch(ctx context.Context, userID uint, q string) ([]SearchResult,
 	results := make([]SearchResult, 0, len(items))
 	for _, item := range items {
 		score := scores[item.ID]
-		results = append(results, SearchResult{Item: item, Score: &score})
+		results = append(results, SearchResult{Item: item, Score: &score, Match: "semantic"})
 	}
 	return results, scoreOf, true
 }

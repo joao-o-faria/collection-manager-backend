@@ -151,6 +151,9 @@ func TestSearchItems_FallsBackToTextWhenEmbedFails(t *testing.T) {
 	if resp.Results[0].Score != nil {
 		t.Errorf("score = %v, want null in text mode", *resp.Results[0].Score)
 	}
+	if resp.Results[0].Match != "text" {
+		t.Errorf("match = %q, want text", resp.Results[0].Match)
+	}
 	if f.gotTextQuery != "moeda" || f.embedder.got != "moeda" {
 		t.Errorf("text query = %q, embed query = %q (embed must have been tried)", f.gotTextQuery, f.embedder.got)
 	}
@@ -221,6 +224,9 @@ func TestSearchItems_IncludesLiteralTextMatchesFirst(t *testing.T) {
 	}
 	if resp.Results[0].Score == nil || *resp.Results[0].Score > 0.2 {
 		t.Errorf("literal match score = %v, want its own (low) cosine", resp.Results[0].Score)
+	}
+	if resp.Results[0].Match != "text" || resp.Results[1].Match != "semantic" {
+		t.Errorf("match = %q, %q; want text, semantic", resp.Results[0].Match, resp.Results[1].Match)
 	}
 	if f.gotTextQuery != "luvas" {
 		t.Errorf("text query = %q", f.gotTextQuery)
