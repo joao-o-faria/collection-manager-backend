@@ -12,6 +12,7 @@ func RegisterItemRoutes(r *gin.Engine) {
 	items.Use(middleware.AuthMiddleware())
 	{
 		items.POST("", handlers.CreateItem)
+		items.POST("/suggest", handlers.SuggestItemDetails)
 		items.GET("", handlers.GetItemsByCollection)
 		items.PUT("/:id", handlers.UpdateItem)
 		items.DELETE("/:id", handlers.DeleteItem)

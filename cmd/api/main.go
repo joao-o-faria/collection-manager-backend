@@ -1,14 +1,18 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"time"
 
+	"collection-manager-backend/internal/ai"
 	"collection-manager-backend/internal/auth"
 	"collection-manager-backend/internal/database"
+	"collection-manager-backend/internal/handlers"
 	"collection-manager-backend/internal/models"
 	"collection-manager-backend/internal/routes"
+	"collection-manager-backend/internal/search"
 	"collection-manager-backend/internal/storage"
 
 	"github.com/gin-contrib/cors"
@@ -56,6 +60,25 @@ func main() {
 
 	createInitialAdmin(db)
 
+	aiClient := ai.NewClient(
+		envOrDefault("OLLAMA_URL", "http://localhost:11434"),
+		envOrDefault("OLLAMA_MODEL", "gemma4:12b"),
+	).WithEmbedModel(envOrDefault("OLLAMA_EMBED_MODEL", ai.DefaultEmbedModel))
+	handlers.InitSuggester(aiClient)
+	handlers.InitAnalyzer(aiClient)
+	handlers.InitSearch(aiClient)
+
+	indexer := search.NewIndexer(aiClient, storage.IndexStore{})
+	handlers.InitIndexer(indexer.IndexItemAsync)
+	go func() {
+		n, err := indexer.IndexMissing(context.Background())
+		if err != nil {
+			log.Printf("indexação inicial falhou: %v", err)
+			return
+		}
+		log.Printf("indexação inicial: %d item(ns) indexado(s)", n)
+	}()
+
 	router := gin.Default()
 
 	router.Use(cors.New(cors.Config{
@@ -73,11 +96,21 @@ func main() {
 	routes.RegisterCategoryRoutes(router)
 	routes.RegisterCollectionRoutes(router)
 	routes.RegisterItemRoutes(router)
+	routes.RegisterQuickAddRoutes(router)
+	routes.RegisterSearchRoutes(router)
+	routes.RegisterHomeRoutes(router)
 	routes.RegisterAuthRoutes(router)
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("erro ao iniciar servidor: %v", err)
 	}
+}
+
+func envOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
 
 func createInitialAdmin(db *gorm.DB) {

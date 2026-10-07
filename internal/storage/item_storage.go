@@ -130,6 +130,10 @@ func UpdateItem(ctx context.Context, userID uint, isAdmin bool, id int, name str
 		}
 	}
 
+	// O texto pode ter mudado: limpa o vetor para ele ser refeito (reindexação ao salvar
+	// ou IndexMissing). Sem isso, com a IA fora, o vetor antigo ficaria para sempre.
+	item.Embedding = nil
+
 	if err := itemDB.WithContext(ctx).Save(&item).Error; err != nil {
 		return models.Item{}, err
 	}
