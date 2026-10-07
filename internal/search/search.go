@@ -8,9 +8,13 @@ import (
 	"collection-manager-backend/internal/models"
 )
 
+// Valores calibrados com embeddinggemma nos itens do projeto: consultas sem relação
+// com a coleção ficam abaixo de ~0,21 e os acertos de uma busca ficam perto do primeiro.
 const (
 	// MinScore é a similaridade mínima para um item aparecer na busca semântica.
-	MinScore float32 = 0.35
+	MinScore float32 = 0.24
+	// RelativeToTop descarta resultados com nota abaixo dessa fração da melhor nota.
+	RelativeToTop float32 = 0.85
 	// Limit é o número máximo de resultados.
 	Limit = 12
 )
@@ -68,8 +72,9 @@ func Cosine(a, b []float32) float32 {
 	return float32(dot / (math.Sqrt(na) * math.Sqrt(nb)))
 }
 
-// Rank ordena os candidatos pela similaridade com a consulta, descartando os abaixo de minScore.
-func Rank(query []float32, candidates []Candidate, minScore float32, limit int) []Scored {
+// Rank ordena os candidatos pela similaridade com a consulta, descartando os abaixo de
+// minScore e os abaixo de relativeToTop × a melhor nota (0 desliga o corte relativo).
+func Rank(query []float32, candidates []Candidate, minScore, relativeToTop float32, limit int) []Scored {
 	out := make([]Scored, 0, len(candidates))
 	for _, c := range candidates {
 		if s := Cosine(query, c.Vector); s >= minScore {
@@ -77,6 +82,14 @@ func Rank(query []float32, candidates []Candidate, minScore float32, limit int) 
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Score > out[j].Score })
+	if len(out) > 0 && relativeToTop > 0 {
+		cut := out[0].Score * relativeToTop
+		n := 0
+		for n < len(out) && out[n].Score >= cut {
+			n++
+		}
+		out = out[:n]
+	}
 	if len(out) > limit {
 		out = out[:limit]
 	}
