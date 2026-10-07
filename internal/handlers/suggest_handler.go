@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 
@@ -71,6 +72,7 @@ func SuggestItemDetails(c *gin.Context) {
 		ImageBase64: input.ImageBase64,
 	})
 	if err != nil {
+		log.Printf("erro na IA: %v", err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Serviço de IA indisponível"})
 		return
 	}

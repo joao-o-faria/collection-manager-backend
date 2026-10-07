@@ -58,10 +58,12 @@ func main() {
 
 	createInitialAdmin(db)
 
-	handlers.InitSuggester(ai.NewClient(
+	aiClient := ai.NewClient(
 		envOrDefault("OLLAMA_URL", "http://localhost:11434"),
 		envOrDefault("OLLAMA_MODEL", "gemma4:12b"),
-	))
+	)
+	handlers.InitSuggester(aiClient)
+	handlers.InitAnalyzer(aiClient)
 
 	router := gin.Default()
 
@@ -80,6 +82,7 @@ func main() {
 	routes.RegisterCategoryRoutes(router)
 	routes.RegisterCollectionRoutes(router)
 	routes.RegisterItemRoutes(router)
+	routes.RegisterQuickAddRoutes(router)
 	routes.RegisterAuthRoutes(router)
 
 	if err := router.Run(":8080"); err != nil {

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -75,44 +76,51 @@ type chatResponse struct {
 
 func (c *Client) SuggestItemDetails(ctx context.Context, item ItemContext) (ItemSuggestion, error) {
 	prompt := fmt.Sprintf("Item: %s\nColeção: %s\nCategoria: %s", item.Name, item.Collection, item.Category)
+	var suggestion ItemSuggestion
+	err := c.chatJSON(ctx, systemPrompt, prompt, item.ImageBase64, suggestionSchema, &suggestion)
+	return suggestion, err
+}
+
+// chatJSON envia uma conversa (system + user, com foto opcional) ao Ollama
+// exigindo resposta no JSON schema informado e decodifica o resultado em out.
+func (c *Client) chatJSON(ctx context.Context, system, prompt, imageBase64 string, schema any, out any) error {
 	user := chatMessage{Role: "user", Content: prompt}
-	if item.ImageBase64 != "" {
-		user.Images = []string{item.ImageBase64}
+	if imageBase64 != "" {
+		user.Images = []string{imageBase64}
 	}
 
 	body, err := json.Marshal(chatRequest{
 		Model:    c.model,
-		Messages: []chatMessage{{Role: "system", Content: systemPrompt}, user},
-		Format:   suggestionSchema,
+		Messages: []chatMessage{{Role: "system", Content: system}, user},
+		Format:   schema,
 	})
 	if err != nil {
-		return ItemSuggestion{}, err
+		return err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/chat", bytes.NewReader(body))
 	if err != nil {
-		return ItemSuggestion{}, err
+		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return ItemSuggestion{}, fmt.Errorf("%w: %v", ErrUnavailable, err)
+		return fmt.Errorf("%w: %v", ErrUnavailable, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return ItemSuggestion{}, fmt.Errorf("%w: status %d", ErrUnavailable, resp.StatusCode)
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("%w: status %d: %s", ErrUnavailable, resp.StatusCode, strings.TrimSpace(string(msg)))
 	}
 
 	var chat chatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&chat); err != nil {
-		return ItemSuggestion{}, fmt.Errorf("%w: resposta inválida: %v", ErrUnavailable, err)
+		return fmt.Errorf("%w: resposta inválida: %v", ErrUnavailable, err)
 	}
-
-	var suggestion ItemSuggestion
-	if err := json.Unmarshal([]byte(chat.Message.Content), &suggestion); err != nil {
-		return ItemSuggestion{}, fmt.Errorf("%w: JSON do modelo inválido: %v", ErrUnavailable, err)
+	if err := json.Unmarshal([]byte(chat.Message.Content), out); err != nil {
+		return fmt.Errorf("%w: JSON do modelo inválido: %v", ErrUnavailable, err)
 	}
-	return suggestion, nil
+	return nil
 }

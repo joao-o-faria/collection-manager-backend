@@ -133,3 +133,15 @@ func TestSuggestItemDetails_ReturnsErrUnavailableOnServerError(t *testing.T) {
 		t.Errorf("err = %v, want ErrUnavailable", err)
 	}
 }
+
+func TestSuggestItemDetails_ErrorIncludesOllamaMessage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"error":"Failed to load image or audio file"}`, http.StatusBadRequest)
+	}))
+	defer srv.Close()
+
+	_, err := NewClient(srv.URL, "gemma4:12b").SuggestItemDetails(context.Background(), ItemContext{Name: "Moeda"})
+	if !errors.Is(err, ErrUnavailable) || !strings.Contains(err.Error(), "Failed to load image") {
+		t.Errorf("err = %v, want ErrUnavailable with Ollama's message", err)
+	}
+}
