@@ -98,7 +98,7 @@ func TestSearchItems_SemanticRanksByCosine(t *testing.T) {
 		candidates: []search.Candidate{
 			{ItemID: 1, Vector: []float32{0, 1}},   // 0 → abaixo do mínimo
 			{ItemID: 2, Vector: []float32{1, 0.2}}, // ~0.98
-			{ItemID: 3, Vector: []float32{1, 1}},   // ~0.71
+			{ItemID: 3, Vector: []float32{1, 0.5}}, // ~0.89 (perto do primeiro: passa no corte relativo)
 		},
 		items: map[int]models.Item{1: {ID: 1}, 2: {ID: 2}, 3: {ID: 3}},
 	}
@@ -198,5 +198,50 @@ func TestSearchItems_AdminOnlySearchesOwnItems(t *testing.T) {
 
 	if f.gotUser != 1 {
 		t.Errorf("user = %d, want 1 (admin's own)", f.gotUser)
+	}
+}
+
+func TestSearchItems_IncludesLiteralTextMatchesFirst(t *testing.T) {
+	// "luvas" tem nota semântica baixa para "Luvas de Boxe", mas o nome contém a palavra.
+	f := &searchFakes{
+		embedder: &fakeQueryEmbedder{vec: []float32{1, 0}},
+		candidates: []search.Candidate{
+			{ItemID: 1, Vector: []float32{0.15, 0.99}}, // ~0.15 → fora do ranking semântico
+			{ItemID: 2, Vector: []float32{1, 0}},       // 1.0
+		},
+		items:       map[int]models.Item{1: {ID: 1}, 2: {ID: 2}},
+		textResults: []models.Item{{ID: 1}},
+	}
+	r := setupSearch(t, f, models.UserRole, 7)
+
+	_, resp := getSearch(r, "luvas")
+
+	if resp.Mode != "semantic" || resultIDs(resp) != "[1 2]" {
+		t.Fatalf("mode = %q ids = %s, want semantic [1 2]", resp.Mode, resultIDs(resp))
+	}
+	if resp.Results[0].Score == nil || *resp.Results[0].Score > 0.2 {
+		t.Errorf("literal match score = %v, want its own (low) cosine", resp.Results[0].Score)
+	}
+	if f.gotTextQuery != "luvas" {
+		t.Errorf("text query = %q", f.gotTextQuery)
+	}
+}
+
+func TestSearchItems_DoesNotDuplicateItemsFoundByBoth(t *testing.T) {
+	f := &searchFakes{
+		embedder: &fakeQueryEmbedder{vec: []float32{1, 0}},
+		candidates: []search.Candidate{
+			{ItemID: 2, Vector: []float32{1, 0}},
+			{ItemID: 3, Vector: []float32{1, 0.1}},
+		},
+		items:       map[int]models.Item{2: {ID: 2}, 3: {ID: 3}},
+		textResults: []models.Item{{ID: 2}},
+	}
+	r := setupSearch(t, f, models.UserRole, 7)
+
+	_, resp := getSearch(r, "moeda")
+
+	if resultIDs(resp) != "[2 3]" {
+		t.Errorf("ids = %s, want [2 3]", resultIDs(resp))
 	}
 }
