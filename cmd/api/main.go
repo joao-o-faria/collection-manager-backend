@@ -98,6 +98,7 @@ func main() {
 	routes.RegisterItemRoutes(router)
 	routes.RegisterQuickAddRoutes(router)
 	routes.RegisterSearchRoutes(router)
+	routes.RegisterHomeRoutes(router)
 	routes.RegisterAuthRoutes(router)
 
 	if err := router.Run(":8080"); err != nil {
