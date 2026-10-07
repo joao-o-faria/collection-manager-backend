@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -77,6 +78,92 @@ func AnalyzeQuickAdd(c *gin.Context) {
 	c.JSON(http.StatusOK, resolveAnalysis(analysis, categories, collections))
 }
 
+var quickAdd = storage.QuickAdd
+
+type QuickAddRefInput struct {
+	ID      int    `json:"id"`
+	NewName string `json:"new_name"`
+}
+
+type QuickAddItemInput struct {
+	Name         string             `json:"name"`
+	Description  *string            `json:"description"`
+	Tags         []string           `json:"tags"`
+	Price        float64            `json:"price"`
+	BinaryObject *BinaryObjectInput `json:"binary_object"`
+}
+
+type CreateQuickAddInput struct {
+	Category   QuickAddRefInput  `json:"category"`
+	Collection QuickAddRefInput  `json:"collection"`
+	Item       QuickAddItemInput `json:"item"`
+}
+
+// toRefInput aceita exatamente um entre id (> 0) e new_name (não vazio).
+func toRefInput(r QuickAddRefInput) (storage.RefInput, bool) {
+	name := strings.TrimSpace(r.NewName)
+	switch {
+	case r.ID > 0 && name == "":
+		return storage.RefInput{ID: r.ID}, true
+	case r.ID == 0 && name != "":
+		return storage.RefInput{NewName: name}, true
+	default:
+		return storage.RefInput{}, false
+	}
+}
+
 func CreateQuickAdd(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "não implementado"})
+	userID, isAdmin, ok := actorFromContext(c)
+	if !ok {
+		return
+	}
+
+	var input CreateQuickAddInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	category, okCat := toRefInput(input.Category)
+	collection, okCol := toRefInput(input.Collection)
+	if !okCat || !okCol {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Informe id ou nome de categoria e coleção"})
+		return
+	}
+	if category.ID == 0 && collection.ID != 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Categoria nova exige coleção nova"})
+		return
+	}
+	name := strings.TrimSpace(input.Item.Name)
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Nome não pode ser vazio"})
+		return
+	}
+	if input.Item.Price < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Valor inválido"})
+		return
+	}
+
+	item, err := quickAdd(c.Request.Context(), userID, isAdmin, storage.QuickAddInput{
+		Category:    category,
+		Collection:  collection,
+		Name:        name,
+		Description: normalizeDescription(input.Item.Description),
+		Tags:        normalizeTags(input.Item.Tags),
+		Price:       input.Item.Price,
+		Binary:      toPayload(input.Item.BinaryObject),
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Categoria ou coleção não encontrada"})
+		case errors.Is(err, storage.ErrCategoryMismatch):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "A coleção não pertence à categoria informada"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao cadastrar item"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusCreated, item)
 }
