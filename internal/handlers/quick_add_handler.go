@@ -31,8 +31,12 @@ type AnalyzeQuickAddInput struct {
 	ImageBase64 string `json:"image_base64"`
 }
 
+// O cadastro rápido trabalha sempre só com os dados do próprio usuário, inclusive
+// para admin: senão a IA poderia colocar o item na coleção de outra pessoa.
+const quickAddAsAdmin = false
+
 func AnalyzeQuickAdd(c *gin.Context) {
-	userID, isAdmin, ok := actorFromContext(c)
+	userID, _, ok := actorFromContext(c)
 	if !ok {
 		return
 	}
@@ -44,12 +48,12 @@ func AnalyzeQuickAdd(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	categories, err := listCategories(ctx, userID, isAdmin, "")
+	categories, err := listCategories(ctx, userID, quickAddAsAdmin, "")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar categorias"})
 		return
 	}
-	collections, err := listCollections(ctx, userID, isAdmin, "")
+	collections, err := listCollections(ctx, userID, quickAddAsAdmin, "")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar coleções"})
 		return
@@ -113,7 +117,7 @@ func toRefInput(r QuickAddRefInput) (storage.RefInput, bool) {
 }
 
 func CreateQuickAdd(c *gin.Context) {
-	userID, isAdmin, ok := actorFromContext(c)
+	userID, _, ok := actorFromContext(c)
 	if !ok {
 		return
 	}
@@ -144,7 +148,7 @@ func CreateQuickAdd(c *gin.Context) {
 		return
 	}
 
-	item, err := quickAdd(c.Request.Context(), userID, isAdmin, storage.QuickAddInput{
+	item, err := quickAdd(c.Request.Context(), userID, quickAddAsAdmin, storage.QuickAddInput{
 		Category:    category,
 		Collection:  collection,
 		Name:        name,

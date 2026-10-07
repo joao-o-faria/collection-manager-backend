@@ -214,3 +214,57 @@ func TestCreateQuickAdd_MapsStorageErrors(t *testing.T) {
 		}
 	}
 }
+
+func newAdminQuickAddRouter() *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	withAdmin := func(h gin.HandlerFunc) gin.HandlerFunc {
+		return func(c *gin.Context) {
+			c.Set("user_id", uint(1))
+			c.Set("user_role", models.AdminRole)
+			h(c)
+		}
+	}
+	r.POST("/quick-add/analyze", withAdmin(AnalyzeQuickAdd))
+	r.POST("/quick-add", withAdmin(CreateQuickAdd))
+	return r
+}
+
+func TestAnalyzeQuickAdd_AdminOnlySeesOwnData(t *testing.T) {
+	setupAnalyze(t, &fakeAnalyzer{result: ai.ImageAnalysis{Name: "x"}})
+	var catAdmin, colAdmin []bool
+	listCategories = func(_ context.Context, _ uint, isAdmin bool, _ string) ([]models.Category, error) {
+		catAdmin = append(catAdmin, isAdmin)
+		return testCats, nil
+	}
+	listCollections = func(_ context.Context, _ uint, isAdmin bool, _ string) ([]models.Collection, error) {
+		colAdmin = append(colAdmin, isAdmin)
+		return testCols, nil
+	}
+
+	w := post(newAdminQuickAddRouter(), "/quick-add/analyze", `{"image_base64":"aW1n"}`)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	if len(catAdmin) != 1 || catAdmin[0] || len(colAdmin) != 1 || colAdmin[0] {
+		t.Errorf("lists called with isAdmin cats=%v cols=%v, want [false]", catAdmin, colAdmin)
+	}
+}
+
+func TestCreateQuickAdd_AdminOnlyUsesOwnData(t *testing.T) {
+	var gotAdmin *bool
+	setupCreate(t, func(_ context.Context, _ uint, isAdmin bool, _ storage.QuickAddInput) (models.Item, error) {
+		gotAdmin = &isAdmin
+		return models.Item{ID: 1}, nil
+	})
+
+	w := post(newAdminQuickAddRouter(), "/quick-add", `{"category":{"id":1},"collection":{"id":10},"item":{"name":"x"}}`)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d", w.Code)
+	}
+	if gotAdmin == nil || *gotAdmin {
+		t.Errorf("QuickAdd isAdmin = %v, want false", gotAdmin)
+	}
+}
