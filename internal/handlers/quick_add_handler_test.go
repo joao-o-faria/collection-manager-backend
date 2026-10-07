@@ -268,3 +268,38 @@ func TestCreateQuickAdd_AdminOnlyUsesOwnData(t *testing.T) {
 		t.Errorf("QuickAdd isAdmin = %v, want false", gotAdmin)
 	}
 }
+
+func TestCreateQuickAdd_NotifiesIndexerOnSuccess(t *testing.T) {
+	var indexed []int
+	prev := indexItem
+	indexItem = func(id int) { indexed = append(indexed, id) }
+	t.Cleanup(func() { indexItem = prev })
+
+	r := setupCreate(t, func(context.Context, uint, bool, storage.QuickAddInput) (models.Item, error) {
+		return models.Item{ID: 77, CollectionID: 1}, nil
+	})
+	w := post(r, "/quick-add", `{"category":{"id":1},"collection":{"id":10},"item":{"name":"x"}}`)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d", w.Code)
+	}
+	if len(indexed) != 1 || indexed[0] != 77 {
+		t.Errorf("indexed = %v, want [77]", indexed)
+	}
+}
+
+func TestCreateQuickAdd_DoesNotNotifyIndexerOnFailure(t *testing.T) {
+	var indexed []int
+	prev := indexItem
+	indexItem = func(id int) { indexed = append(indexed, id) }
+	t.Cleanup(func() { indexItem = prev })
+
+	r := setupCreate(t, func(context.Context, uint, bool, storage.QuickAddInput) (models.Item, error) {
+		return models.Item{}, storage.ErrNotFound
+	})
+	post(r, "/quick-add", `{"category":{"id":1},"collection":{"id":10},"item":{"name":"x"}}`)
+
+	if len(indexed) != 0 {
+		t.Errorf("indexed = %v, want none", indexed)
+	}
+}

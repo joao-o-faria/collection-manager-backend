@@ -60,3 +60,20 @@ migrate -source file://migrations -database "postgres://user:pwd@localhost:5433/
 ```
 
 > **Dica:** Você pode substituir a string de conexão pela variável de ambiente configurada no seu terminal se preferir.
+
+## 🤖 IA local (Ollama)
+
+Os recursos de IA usam o [Ollama](https://ollama.com) rodando localmente:
+
+- `OLLAMA_URL` (padrão `http://localhost:11434`)
+- `OLLAMA_MODEL` — modelo de chat/visão (padrão `gemma4:12b`)
+- `OLLAMA_EMBED_MODEL` — modelo de embedding da busca semântica (padrão `embeddinggemma`)
+
+Antes do primeiro uso, baixe os modelos:
+
+```bash
+ollama pull gemma4:12b
+ollama pull embeddinggemma
+```
+
+Sem o Ollama, o sistema continua funcionando: a busca da Home usa busca por texto.

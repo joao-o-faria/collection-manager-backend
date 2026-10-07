@@ -171,5 +171,6 @@ func CreateQuickAdd(c *gin.Context) {
 		return
 	}
 
+	notifyItemSaved(item.ID)
 	c.JSON(http.StatusCreated, item)
 }
