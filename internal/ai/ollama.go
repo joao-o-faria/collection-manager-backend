@@ -31,16 +31,18 @@ var suggestionSchema = map[string]any{
 }
 
 type Client struct {
-	baseURL string
-	model   string
-	http    *http.Client
+	baseURL    string
+	model      string
+	embedModel string
+	http       *http.Client
 }
 
 func NewClient(baseURL, model string) *Client {
 	return &Client{
-		baseURL: strings.TrimRight(baseURL, "/"),
-		model:   model,
-		http:    &http.Client{Timeout: 90 * time.Second},
+		baseURL:    strings.TrimRight(baseURL, "/"),
+		model:      model,
+		embedModel: DefaultEmbedModel,
+		http:       &http.Client{Timeout: 90 * time.Second},
 	}
 }
 
