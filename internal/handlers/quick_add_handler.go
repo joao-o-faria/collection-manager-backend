@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 
@@ -75,6 +76,7 @@ func AnalyzeQuickAdd(c *gin.Context) {
 
 	analysis, err := analyzer.AnalyzeItemImage(ctx, input.ImageBase64, catOptions, colOptions)
 	if err != nil {
+		log.Printf("erro na IA: %v", err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Serviço de IA indisponível"})
 		return
 	}
