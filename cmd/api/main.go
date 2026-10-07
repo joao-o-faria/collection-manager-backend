@@ -5,8 +5,10 @@ import (
 	"os"
 	"time"
 
+	"collection-manager-backend/internal/ai"
 	"collection-manager-backend/internal/auth"
 	"collection-manager-backend/internal/database"
+	"collection-manager-backend/internal/handlers"
 	"collection-manager-backend/internal/models"
 	"collection-manager-backend/internal/routes"
 	"collection-manager-backend/internal/storage"
@@ -56,6 +58,11 @@ func main() {
 
 	createInitialAdmin(db)
 
+	handlers.InitSuggester(ai.NewClient(
+		envOrDefault("OLLAMA_URL", "http://localhost:11434"),
+		envOrDefault("OLLAMA_MODEL", "gemma4:12b"),
+	))
+
 	router := gin.Default()
 
 	router.Use(cors.New(cors.Config{
@@ -78,6 +85,13 @@ func main() {
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("erro ao iniciar servidor: %v", err)
 	}
+}
+
+func envOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
 
 func createInitialAdmin(db *gorm.DB) {
