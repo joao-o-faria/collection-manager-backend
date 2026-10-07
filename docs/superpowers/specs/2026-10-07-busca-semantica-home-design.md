@@ -133,3 +133,10 @@ Modelo de embedding: **`embeddinggemma`** (Google, ~600 MB, multilíngue, bom em
 - Reindexar itens quando coleção/categoria é renomeada (o texto antigo vale até o item ser editado).
 - Buscar coleções/categorias; filtros; paginação; busca a cada tecla.
 - Busca por imagem.
+
+## Ajustes feitos na implementação (2026-10-07)
+
+Medidos com `embeddinggemma` nos itens reais do projeto:
+
+- **Corte de relevância:** `MinScore` ficou em **0,24** (consultas sem relação com a coleção chegam no máximo a ~0,21; as relevantes começam em ~0,26), e `Rank` ganhou o corte relativo **`RelativeToTop = 0,85`**: só ficam resultados com nota ≥ 85% da melhor. Ex.: "videogame" → os 3 consoles (0,28–0,30) e não o Hot Wheels (0,16).
+- **Busca híbrida:** embeddings pontuam mal palavras soltas ("luvas" × "Luvas de Boxe" = 0,15). Por isso a busca textual (ILIKE) roda **sempre**: itens que contêm a frase literalmente vêm primeiro (com a própria nota de cosseno, se indexados), seguidos dos resultados semânticos, sem repetir, até `Limit`. O `mode` continua `"semantic"`; só vira `"text"` quando a IA está indisponível ou nenhum item foi indexado.
