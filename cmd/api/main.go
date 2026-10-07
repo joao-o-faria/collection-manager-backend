@@ -66,6 +66,7 @@ func main() {
 	).WithEmbedModel(envOrDefault("OLLAMA_EMBED_MODEL", ai.DefaultEmbedModel))
 	handlers.InitSuggester(aiClient)
 	handlers.InitAnalyzer(aiClient)
+	handlers.InitSearch(aiClient)
 
 	indexer := search.NewIndexer(aiClient, storage.IndexStore{})
 	handlers.InitIndexer(indexer.IndexItemAsync)
@@ -96,6 +97,7 @@ func main() {
 	routes.RegisterCollectionRoutes(router)
 	routes.RegisterItemRoutes(router)
 	routes.RegisterQuickAddRoutes(router)
+	routes.RegisterSearchRoutes(router)
 	routes.RegisterAuthRoutes(router)
 
 	if err := router.Run(":8080"); err != nil {
